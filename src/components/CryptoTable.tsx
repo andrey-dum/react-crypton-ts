@@ -1,4 +1,6 @@
 import React from 'react'
+import { observer, inject } from 'mobx-react';
+// import { observer } from 'mobx-react-lite';
 
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
@@ -7,22 +9,16 @@ import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import Paper from '@material-ui/core/Paper';
+import { TCoin, TCoinDiff } from '../types';
+import ConverterStore from '../stores/converterStore';
+import CurrenciesStore from '../stores/currenciesStore';
 
-import axios from 'axios';
-
-
-type ICryptoTable = {
+interface ICryptoTable {
     classes: any;
+    currenciesStore?: CurrenciesStore;
+    converterStore?: ConverterStore;
+};
 
-  };
-
-export type TCoin = {
-    name: string;
-    fullName: string;
-    imageUrl: string;
-    price: number;
-    volume24Hour: number;
-  };
 // export interface TCoin {
 //     name: string;
 //     fullName: string;
@@ -33,29 +29,47 @@ export type TCoin = {
 
 
 
-const CryptoTable = ({classes}: ICryptoTable) => {
-    const [items, setItems] = React.useState<TCoin[]>([])
-    React.useEffect(() => {
-       
-        axios
-            .get('https://min-api.cryptocompare.com/data/top/totalvolfull?limit=10&tsym=USD')
-            .then(({ data }) => {
+const CryptoTable =  inject(
+  'currenciesStore',
+  'converterStore',
+)(observer(({classes, currenciesStore, converterStore }: ICryptoTable) => {
+  const items: TCoin[] = currenciesStore!.getItems;
+  const diffObj: TCoinDiff = currenciesStore!.getDiffObj;
+  // const [items, setItems] = React.useState<TCoin[]>([])
+  //   React.useEffect(() => {
+  //       axios
+  //         .get('https://min-api.cryptocompare.com/data/top/totalvolfull?limit=10&tsym=USD')
+  //         .then(({ data }) => {
 
-              const coins: TCoin[] = data.Data.map((coin: any) => {
-                const obj: TCoin = {
-                  name: coin.CoinInfo.Name,
-                  fullName: coin.CoinInfo.FullName,
-                  imageUrl: `https://www.cryptocompare.com/${coin.CoinInfo.ImageUrl}`,
-                  price: coin.RAW.USD.PRICE.toFixed(3),
-                  volume24Hour: parseInt(coin.RAW.USD.VOLUME24HOUR),
-                };
-                return obj;
-              });
-              setItems(coins);
+  //           const coins: TCoin[] = data.Data.map((coin: any) => {
+  //             const obj: TCoin = {
+  //               name: coin.CoinInfo.Name,
+  //               fullName: coin.CoinInfo.FullName,
+  //               imageUrl: `https://www.cryptocompare.com/${coin.CoinInfo.ImageUrl}`,
+  //               price: coin.RAW.USD.PRICE.toFixed(3),
+  //               volume24Hour: parseInt(coin.RAW.USD.VOLUME24HOUR),
+  //             };
+  //             return obj;
+  //           });
+  //           setItems(coins);
 
-             });
-
+  //           });
+  // }, []);
+  React.useEffect(() => {
+    if (currenciesStore) {
+      currenciesStore?.fetchCoins();
+      setInterval(() => {
+        currenciesStore.fetchCoins();
+      }, 30 * 1000);
+    }
+   
   }, []);
+
+  const onClickRow = (coin: TCoin) => {
+    if (converterStore) {
+      converterStore.setSelectedCoin(coin);
+    }
+  };
 
     return (
         <TableContainer component={Paper}>
@@ -74,6 +88,7 @@ const CryptoTable = ({classes}: ICryptoTable) => {
               ? 'Загрузка...'
               : items.map((coin: TCoin) => (
                   <TableRow
+                    onClick={() => onClickRow(coin)}
                     className={classes.rowCurrency}
                     hover
                     key={coin.name}>
@@ -83,8 +98,9 @@ const CryptoTable = ({classes}: ICryptoTable) => {
                     <TableCell align="left">{coin.name}</TableCell>
                     <TableCell align="left">{coin.fullName}</TableCell>
                     <TableCell
-                     
-                      align="left">
+                      className={diffObj[coin.name] && classes[`${diffObj[coin.name]}Column`]}
+                      align="left"
+                    >
                       ${coin.price}
                     </TableCell>
                     <TableCell align="left">${coin.volume24Hour}</TableCell>
@@ -94,7 +110,8 @@ const CryptoTable = ({classes}: ICryptoTable) => {
         </Table>
       </TableContainer>
     )
-}
+})
+)
 
 
 export default CryptoTable
